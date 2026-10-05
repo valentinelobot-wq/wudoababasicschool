@@ -1,0 +1,5 @@
+const router=require("express").Router(),bcrypt=require("bcryptjs"),jwt=require("jsonwebtoken"),db=require("../db"),{auth,roles}=require("../middleware/auth");
+router.post("/login",async(q,s,n)=>{try{let{username,password}=q.body;let[r]=await db.query("SELECT * FROM users WHERE username=? AND active=1",[username]);if(!r.length||!(await bcrypt.compare(password,r[0].password_hash)))return s.status(401).json({message:"Invalid username or password"});let u=r[0],token=jwt.sign({id:u.id,role:u.role,username:u.username},process.env.JWT_SECRET,{expiresIn:"8h"});s.json({token,user:{id:u.id,username:u.username,role:u.role,full_name:u.full_name}})}catch(e){n(e)}});
+router.get("/me",auth,async(q,s,n)=>{try{let[r]=await db.query("SELECT id,username,role,full_name FROM users WHERE id=?",[q.user.id]);s.json(r[0])}catch(e){n(e)}});
+router.post("/users",auth,roles("admin"),async(q,s,n)=>{try{let{username,password,role,full_name}=q.body;let h=await bcrypt.hash(password,12);let[r]=await db.query("INSERT INTO users(username,password_hash,role,full_name) VALUES(?,?,?,?)",[username,h,role,full_name]);s.status(201).json({id:r.insertId})}catch(e){n(e)}});
+module.exports=router;
